@@ -6,8 +6,12 @@ use utf8;
 
 use LCS;
 use LCS::Tiny;
+use String::Similarity;
+use LCS::Similar;
 
 use Data::Dumper;
+
+our $VERSION = '0.01';
 
 binmode(STDOUT,":encoding(UTF-8)");
 binmode(STDERR,":encoding(UTF-8)");
@@ -15,7 +19,22 @@ binmode(STDERR,":encoding(UTF-8)");
 my $file1 = '../your/path/yourbook_page_0153_ocr.txt';
 my $file2 = '../your/path/yourbook_page_0153_corr.txt'; # ground truth
 
-my $suppress_equals = 0; # suppress details of equal lines
+# $ARGV[0]\n";
+if (@ARGV >= 1) {
+  $file1 = $ARGV[0];
+  if (@ARGV >= 2) {
+    $file2 = $ARGV[1];
+  }
+}
+
+print $0,' Version ',$VERSION,"\n";
+print "\n";
+print 'comparing OCR text output against ground truth (grt):',"\n";
+print 'File 1 (OCR): ',$file1,"\n";
+print 'File 2 (GRT): ',$file2,"\n";
+print "\n";
+
+my $suppress_equals = 1; # suppress details of equal lines: 1=short,2=none
 
 #my $file2 = 'isis_152_bhl.txt';
 
@@ -31,7 +50,14 @@ my @lines2 = map { $_ =~ s/\s+$//; my $s = $_ . $nl; $s} grep {/./} @lines;
 
 my $stats = {};
 
-my $lcs = LCS::Tiny->LCS(\@lines1,\@lines2);
+my $compare = sub {
+  my ($a,$b,$threshold) = @_;
+  my $similarity = similarity($a,$b);
+  return $similarity if ($similarity >= $threshold);
+};
+
+#my $lcs = LCS::Tiny->LCS(\@lines1,\@lines2);
+my $lcs = LCS::Similar->LCS(\@lines1,\@lines2,$compare,0.7);
 my $aligned = LCS->lcs2align(\@lines1,\@lines2,$lcs);
 
 my $count_aligned = [count_aligned($aligned)];
@@ -64,7 +90,8 @@ for my $chunk (@$aligned) {
   my $chars_aligned = LCS->lcs2align(
     \@chars1,
     \@chars2,
-    LCS::Tiny->LCS(\@chars1,\@chars2)
+    #LCS::Tiny->LCS(\@chars1,\@chars2)
+    LCS::Similar->LCS(\@chars1,\@chars2,\&confusable,0.7)
   );
 
   my ($matches, $inserts, $substitutions, $deletions) =
@@ -72,17 +99,21 @@ for my $chunk (@$aligned) {
 
   my $is_equal = ($matches == @chars1 && $matches == @chars1);
 
-  unless ($suppress_equals && $is_equal) {
-    # accuracy = matches/(matches+subs+inss+dels)
-    my $accuracy = $matches / ($matches + $substitutions + $inserts + $deletions);
+  my $accuracy = $matches / ($matches + $substitutions + $inserts + $deletions);
+  add_stats($stats->{'chars'}, ($matches, $inserts, $substitutions, $deletions));
 
-    add_stats($stats->{'chars'}, ($matches, $inserts, $substitutions, $deletions));
-
+  unless ($suppress_equals >= 2 && $is_equal) {
     my ($s1,$s2) =   LCS->align2strings($chars_aligned);
-    print $s1,"\n";
-    print relation_aligned($chars_aligned),' ',sprintf('%0.3f',$accuracy),"\n";
-    print $s2,"\n";
-    print "\n";
+    unless ($suppress_equals >= 1 && $is_equal) {
+      print $s1,"\n";
+      print relation_aligned($chars_aligned),' ',sprintf('%0.3f',$accuracy),"\n";
+      print $s2,"\n";
+      print "\n";
+    }
+    else {
+      print $s1,' ',sprintf('%0.3f',$accuracy),"\n";
+      print "\n";
+    }
   }
 }
 
@@ -91,6 +122,43 @@ calc_stats($stats->{'words'});
 calc_stats($stats->{'chars'});
 
 print_stats($stats);
+
+###########################
+sub confusable {
+  my ($a, $b, $threshold) = @_;
+
+  $a //= '';
+  $b //= '';
+  $threshold //= 0.7;
+
+  return 1 if ($a eq $b);
+  return 1 if (!$a && !$b);
+
+  my $map = {
+    'e' => 'c',
+    'c' => 'e',
+    'm' => 'n',
+    'n' => 'm',
+    'i' => 't',
+    't' => 'i',
+    't' => 'f',
+    'f' => 't',
+    'ſ' => 'j',
+    'j' => 'ſ',
+    's' => 'f',
+    'f' => 's',
+    't' => 'l',
+    'l' => 't',
+    'c' => '&',
+    '&' => 'c',
+    'u' => 'n',
+    'n' => 'u',
+    'h' => 'l',
+    'l' => 'h',
+  };
+
+  return $threshold if (exists $map->{$a} && $map->{$a} eq $b);
+}
 
 sub relation_aligned {
   my $aligned = shift;
@@ -181,6 +249,8 @@ sub calc_stats {
     ( 2 * $stats->{'recall'} * $stats->{'precision'} )
       / ($stats->{'recall'} + $stats->{'precision'} );
 }
+
+
 
 
 

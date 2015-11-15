@@ -1,4 +1,10 @@
 Revision history for ocr-measures
 
-{{$NEXT}}
+0.02
+		- files as shell parameters
+		- report filenames
+		- suppress equal lines medium
+		  prints only one line if the two lines are equal
+
+0.01
         - Initial release
