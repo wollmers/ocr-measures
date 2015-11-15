@@ -5,6 +5,13 @@ Revision history for ocr-measures
 		- report filenames
 		- suppress equal lines medium
 		  prints only one line if the two lines are equal
+		- suppress printing lines alignment
+        - remove punctuation from words
+        - list matched and confused words
+        - list matched and confused characters
+        - output character confusion table
+        - smarter alignment of lines
+        - smarter alignment of characters
 
 0.01
         - Initial release

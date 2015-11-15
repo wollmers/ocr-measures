@@ -9,6 +9,9 @@ use LCS::Tiny;
 use String::Similarity;
 use LCS::Similar;
 
+use Getopt::Long  '2.32';
+use Pod::Usage;
+
 use Data::Dumper;
 
 our $VERSION = '0.01';
@@ -16,8 +19,35 @@ our $VERSION = '0.01';
 binmode(STDOUT,":encoding(UTF-8)");
 binmode(STDERR,":encoding(UTF-8)");
 
-my $file1 = '../your/path/yourbook_page_0153_ocr.txt';
-my $file2 = '../your/path/yourbook_page_0153_corr.txt'; # ground truth
+my $file1 = '';
+my $file2 = ''; # ground truth
+
+#######################
+
+my $verbose;
+my $lines = 0; 			# details aligned lines: 1=short,2=full
+my $clean_words = 1;    # remove punctuation from words
+my $word_matches = 0;
+my $char_matches = 0;
+my $match_table  = 0;
+my $help = 0;
+my $man = 0;
+
+GetOptions(
+  'lines|l'           => \$lines,
+  'trim_words|t'      => \$clean_words,
+  'word_matches|w'    => \$word_matches,
+  'char_matches|c'    => \$char_matches,
+  'match_table|m'     => \$match_table,
+  'help|h'			  => \$help,
+  'man'			      => \$man,
+)
+or pod2usage(2);
+pod2usage(1) if $help;
+pod2usage(-exitval => 0, -verbose => 2) if $man;
+# or die("Error in command line arguments\n");
+
+#######################
 
 # $ARGV[0]\n";
 if (@ARGV >= 1) {
@@ -27,16 +57,14 @@ if (@ARGV >= 1) {
   }
 }
 
+pod2usage(1) unless ($file1 && $file2);
+
 print $0,' Version ',$VERSION,"\n";
 print "\n";
-print 'comparing OCR text output against ground truth (grt):',"\n";
+print 'Compare OCR text output against ground truth (GRT):',"\n";
 print 'File 1 (OCR): ',$file1,"\n";
 print 'File 2 (GRT): ',$file2,"\n";
 print "\n";
-
-my $suppress_equals = 1; # suppress details of equal lines: 1=short,2=none
-
-#my $file2 = 'isis_152_bhl.txt';
 
 open(my $in1,"<:encoding(UTF-8)",$file1) or die "cannot open $file1: $!";
 open(my $in2,"<:encoding(UTF-8)",$file2) or die "cannot open $file2: $!";
@@ -56,7 +84,6 @@ my $compare = sub {
   return $similarity if ($similarity >= $threshold);
 };
 
-#my $lcs = LCS::Tiny->LCS(\@lines1,\@lines2);
 my $lcs = LCS::Similar->LCS(\@lines1,\@lines2,$compare,0.7);
 my $aligned = LCS->lcs2align(\@lines1,\@lines2,$lcs);
 
@@ -70,10 +97,8 @@ $stats->{'chars'} = {};
 
 add_stats($stats->{'lines'}, count_aligned($aligned));
 
-#print Dumper($stats);
-#exit;
-
-#exit;
+my $word_mismatches = {};
+my $char_mismatches = {};
 
 for my $chunk (@$aligned) {
   my @words1 = $chunk->[0] =~ /(\S+)/g;
@@ -84,6 +109,7 @@ for my $chunk (@$aligned) {
     LCS::Tiny->LCS(\@words1,\@words2)
   );
   add_stats($stats->{'words'}, count_aligned($words_aligned));
+  record_mismatches($words_aligned, $word_mismatches, $clean_words);
 
   my @chars1 = $chunk->[0] =~ /(.)/g;
   my @chars2 = $chunk->[1] =~ /(.)/g;
@@ -96,34 +122,104 @@ for my $chunk (@$aligned) {
 
   my ($matches, $inserts, $substitutions, $deletions) =
     count_aligned($chars_aligned);
+  record_mismatches($chars_aligned, $char_mismatches);
 
   my $is_equal = ($matches == @chars1 && $matches == @chars1);
 
   my $accuracy = $matches / ($matches + $substitutions + $inserts + $deletions);
   add_stats($stats->{'chars'}, ($matches, $inserts, $substitutions, $deletions));
 
-  unless ($suppress_equals >= 2 && $is_equal) {
+  if ($lines >= 1) {
     my ($s1,$s2) =   LCS->align2strings($chars_aligned);
-    unless ($suppress_equals >= 1 && $is_equal) {
+    if ($is_equal) {
+      print $s1,' ',sprintf('%0.3f',$accuracy),"\n";
+      print "\n";
+    }
+
+    else {
       print $s1,"\n";
       print relation_aligned($chars_aligned),' ',sprintf('%0.3f',$accuracy),"\n";
       print $s2,"\n";
       print "\n";
     }
-    else {
-      print $s1,' ',sprintf('%0.3f',$accuracy),"\n";
-      print "\n";
-    }
+
   }
+}
+
+if ($word_matches) {
+  print "\n";
+  print 'Word mismatches:',"\n";
+  print_mismatches($word_mismatches,1);
+}
+
+if ($char_matches) {
+  print "\n";
+  print 'Character mismatches:',"\n";
+  print_mismatches($char_mismatches,1);
+}
+
+if ($match_table) {
+  print "\n";
+  print 'Character match (confusion) table:',"\n";
+  print_confusion_table($char_mismatches,1);
 }
 
 calc_stats($stats->{'lines'});
 calc_stats($stats->{'words'});
 calc_stats($stats->{'chars'});
 
+print "\n";
+print 'Summary:',"\n";
+print "\n";
 print_stats($stats);
 
 ###########################
+sub print_mismatches {
+  my ($mismatches, $suppress_matches) = @_;
+  for my $token (sort keys %$mismatches) {
+    my $count = 0;
+    for my $mismatch (sort keys %{$mismatches->{$token}}) {
+      $count += $mismatches->{$token}->{$mismatch};
+    }
+    #unless ( scalar(keys %{$mismatches->{$token}}) == 1
+    #  ## && shift(keys %{$mismatches->{$token}}) eq $token
+    #  && $suppress_matches) {
+    unless ( exists $mismatches->{$token}->{$token}
+      && $mismatches->{$token}->{$token} == $count
+      && $suppress_matches) {
+
+      print '"',$token,'"',sprintf('%6s',$count),"\n";
+      for my $mismatch (sort keys %{$mismatches->{$token}}) {
+        print '  ','"',$mismatch,'"',
+          sprintf('%6s',$mismatches->{$token}->{$mismatch}),
+          ' (',sprintf('%0.4f',$mismatches->{$token}->{$mismatch}/$count),')',
+          "\n";
+      }
+    }
+  }
+}
+
+sub print_confusion_table {
+  my ($mismatches, $suppress_matches) = @_;
+  for my $token (sort keys %$mismatches) {
+    my $count = 0;
+    for my $mismatch (sort keys %{$mismatches->{$token}}) {
+      $count += $mismatches->{$token}->{$mismatch};
+    }
+    unless ( exists $mismatches->{$token}->{$token}
+      && $mismatches->{$token}->{$token} == $count
+      && $suppress_matches) {
+
+      for my $mismatch (sort keys %{$mismatches->{$token}}) {
+        print $token,' ',$mismatch,' ',
+          sprintf('%0.4f',$mismatches->{$token}->{$mismatch}/$count),
+          "\n"
+          unless ($token eq $mismatch && $suppress_matches);
+      }
+    }
+  }
+}
+
 sub confusable {
   my ($a, $b, $threshold) = @_;
 
@@ -192,6 +288,31 @@ sub count_aligned {
   return ($matches, $inserts, $substitutions, $deletions);
 }
 
+sub record_mismatches {
+  my ($aligned, $mismatches, $clean_words) = @_;
+
+  for my $chunk (@$aligned) {
+    #if ($chunk->[0] && $chunk->[1] && $chunk->[0] ne $chunk->[1]) {
+    my $token1 = $chunk->[0];
+    my $token2 = $chunk->[1];
+
+    my $prefix  = qr/ [\(\)\[\]='",;:!?\.]+ /xms;
+    my $suffix  = qr/ [\(\)\[\]='",;:!?¶]+ /xms;
+
+    # TODO: better definition of word characters
+    if ($clean_words) {
+      $token1 =~ s/^$prefix//;
+      $token1 =~ s/$suffix$//;
+      $token2 =~ s/^$prefix//;
+      $token2 =~ s/$suffix$//;
+    }
+
+    if ($token1 && $token2) {
+      $mismatches->{$token2}->{$token1}++;
+    }
+  }
+}
+
 sub add_stats {
   my $stats = shift;
   my $data = {};
@@ -250,7 +371,60 @@ sub calc_stats {
       / ($stats->{'recall'} + $stats->{'precision'} );
 }
 
+__END__
 
+=head1 NAME
+
+ocr_compare.pl - compare OCR output against ground truth
+
+=head1 SYNOPSIS
+
+ocr_compare.pl [options] ocrfile ground_truh_file
+
+ Options:
+   -help            brief help message
+   -man             full documentation
+
+=head1 DESCRIPTION
+
+B<This program> will read the given input file(s) and do something
+useful with the contents thereof.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-help>
+
+Print a brief help message and exits.
+
+=item B<-man>
+
+Prints the manual page and exits.
+
+=item B<-lines>, B<-l>
+
+Print alignment of lines. Default: off.
+
+=item B<-trim_words>, B<-t>
+
+Trim punction characters at start and end of words. Default: on.
+
+=item B<-tword_matches>, B<-w>
+
+Report mismatches of words with frequencies. Default: off.
+
+=item B<-char_matches>, B<-c>
+
+Report mismatches of words with frequencies. Default: off.
+
+=item B<-match_table>, B<-m>
+
+Output character mismatches usable as confusion matrix. Default: off.
+
+=back
+
+=cut
 
 
 
