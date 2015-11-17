@@ -7,11 +7,14 @@ use utf8;
 use String::Similarity;
 # $similarity = similarity $string1, $string2, $limit;
 
-my @files = qw(
-mybook_152.deu-frak+deu_corr.txt
-mybook_152.deu+deu-frak_3.04.txt
-mybook_152_bhl.txt
-);
+
+my @files = @ARGV;
+
+#qw(
+#mybook_152.deu-frak+deu_corr.txt
+#mybook_152.deu+deu-frak_3.04.txt
+#mybook_152_bhl.txt
+#);
 
 binmode(STDOUT,":encoding(UTF-8)");
 binmode(STDERR,":encoding(UTF-8)");
@@ -20,6 +23,7 @@ my $pieces_all = 0;
 my $word_all = 0;
 my $crap_all = 0;
 
+my $lookup = 1;
 
 my $prefix  = qr/ [\(]? [='"-]? /xms;
 my $suffix  = qr/ [='"\.]? [\)]? [,\.;:!?]? | [=-] /xms;
@@ -32,34 +36,31 @@ my $sane    = qr/ (?: (?: $prefix )? $word (?: $suffix)? ) | $numeric (?: $suffi
 
 my $dicts = {
   'fra_10K' => {
-	'file' => '/path/to/fra_2000_top10K_words.txt',
+	'file' => '/Users/helmut/github/ocr/ocr-dicts/fra_10K.txt',
   },
   'eng_10K' => {
-	'file' => '/path/to/eng_2000_top10K_words.txt',
+	'file' => '/Users/helmut/github/ocr/ocr-dicts/eng_10K.txt',
   },
   'deu_10K' => {
-    'file' => '/path/to/deu_2000_top10K_words.txt',
+    'file' => '/Users/helmut/github/ocr/ocr-dicts/deu_10K.txt',
   },
   'deu__1M' => {
-	'file' => '/path/to/deu_2000_top1M_words.txt',
+	'file' => '/Users/helmut/github/ocr/ocr-dicts/deu__1M.txt',
   },
-  'deu_18*' => {
-	'file' => '/path/to/deu_1800_delta_words.txt',
+  'deu_18_' => {
+	'file' => '/Users/helmut/github/ocr/ocr-dicts/deu_18_.txt',
   },
   'lat_10K' => {
-	'file' => '/path/to/lat_2000_top10K_words.txt',
+	'file' => '/Users/helmut/github/ocr/ocr-dicts/lat_10K.txt',
   },
   'lat__1M' => {
-    'file' => '/path/to/deu_2000_top1M_words.txt',
+    'file' => '/Users/helmut/github/ocr/ocr-dicts/lat__1M.txt',
   },
   'authors' => {
-    'file' => '/path/to/authors/all_authors_words_uniq.txt',
+    'file' => '/Users/helmut/github/ocr/ocr-dicts/authors.txt',
   },
-  'taxons' => {
-    'file' => '/path/to/taxons/all_taxon_words_uniq.txt',
-  },
-  'geonames' => {
-    'file' => '/path/to/geonames/all_geonames.txt',
+  'lat_taxa' => {
+    'file' => '/Users/helmut/github/ocr/ocr-dicts/lat_taxa.txt',
   },
 };
 
@@ -69,8 +70,10 @@ deu_10K
 eng_10K
 lat_10K
 authors
+lat_taxa
 )];
 
+if ($lookup) {
 for my $dict (keys %{$dicts}) {
   open(my $dict_in,"<:encoding(UTF-8)",$dicts->{$dict}->{'file'})
     or die "cannot open $dicts->{$dict}->{'file'}: $!";
@@ -86,6 +89,7 @@ print 'used dicts: ', "\n";
 for my $dict (sort keys %{$dicts}) {
   print '   ',$dict,': ',sprintf('%8s',scalar(keys %{$dicts->{$dict}->{'dict'}})), "\n";
 }
+}
 
 my $existing_count = 0;
 my $lookup_count = 0;
@@ -98,6 +102,7 @@ sub dict_lookup {
   my $keyword = shift;
   #$lookup_count++;
   my @matches;
+  return @matches unless $lookup;
   #$keyword =~ s/(?: $prefix )? ($word) (?: $suffix)? /$1/xms;
   for my $dict (sort keys %{$dicts}) {
     if (exists $dicts->{$dict}->{'dict'}->{$keyword}) {
@@ -118,6 +123,7 @@ sub dict_similar {
   my $keyword = shift;
   #$lookup_count++;
   my @matches;
+  return @matches unless $lookup;
   #$keyword =~ s/(?: $prefix )? ($word) (?: $suffix)? /$1/xms;
   for my $dict (@$dict_similar) {
     for my $word (keys %{$dicts->{$dict}->{'dict'}} ) {
@@ -173,7 +179,7 @@ sub score_file {
         if (@similar) {
           $crap_similar++;
         }
-        #print $piece, "\n";
+        print $piece, "\n";
       }
     }
   }

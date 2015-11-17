@@ -14,7 +14,7 @@ use Pod::Usage;
 
 use Data::Dumper;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 binmode(STDOUT,":encoding(UTF-8)");
 binmode(STDERR,":encoding(UTF-8)");
@@ -82,10 +82,13 @@ my $compare = sub {
   my ($a,$b,$threshold) = @_;
   my $similarity = similarity($a,$b);
   return $similarity if ($similarity >= $threshold);
+  return 0;
 };
 
-my $lcs = LCS::Similar->LCS(\@lines1,\@lines2,$compare,0.7);
+my $lcs = LCS::Similar->LCS(\@lines1,\@lines2,$compare,0.5);
 my $aligned = LCS->lcs2align(\@lines1,\@lines2,$lcs);
+
+#print Dumper($aligned);
 
 my $count_aligned = [count_aligned($aligned)];
 
@@ -124,7 +127,7 @@ for my $chunk (@$aligned) {
     count_aligned($chars_aligned);
   record_mismatches($chars_aligned, $char_mismatches);
 
-  my $is_equal = ($matches == @chars1 && $matches == @chars1);
+  my $is_equal = ($matches == @chars1 && $matches == @chars2);
 
   my $accuracy = $matches / ($matches + $substitutions + $inserts + $deletions);
   add_stats($stats->{'chars'}, ($matches, $inserts, $substitutions, $deletions));
@@ -410,7 +413,7 @@ Print alignment of lines. Default: off.
 
 Trim punction characters at start and end of words. Default: on.
 
-=item B<-tword_matches>, B<-w>
+=item B<-word_matches>, B<-w>
 
 Report mismatches of words with frequencies. Default: off.
 
