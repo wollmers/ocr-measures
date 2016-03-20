@@ -7,14 +7,19 @@ use utf8;
 use String::Similarity;
 # $similarity = similarity $string1, $string2, $limit;
 
+use Data::Dumper;
 
 my @files = @ARGV;
 
-#qw(
-#mybook_152.deu-frak+deu_corr.txt
-#mybook_152.deu+deu-frak_3.04.txt
-#mybook_152_bhl.txt
-#);
+my $dir = '.';
+my $extension = 'txt';
+
+unless (@files) {
+  opendir(my $dh, $dir) || die "can't opendir $dir: $!";
+  @files = grep { /\.${extension}$/ && -f "$dir/$_" } readdir($dh);
+  closedir $dh;
+}
+
 
 binmode(STDOUT,":encoding(UTF-8)");
 binmode(STDERR,":encoding(UTF-8)");
@@ -23,16 +28,68 @@ my $pieces_all = 0;
 my $word_all = 0;
 my $crap_all = 0;
 
-my $lookup = 1;
+my $crap = {};
 
-my $prefix  = qr/ [\(]? [='"-]? /xms;
-my $suffix  = qr/ [='"\.]? [\)]? [,\.;:!?]? | [=-] /xms;
-my $LETTER  = qr/ [A-ZÏËÖÜÄÉÈČÁÀÆŒ]/xms;
-my $letter  = qr/ [a-zïëöüäåéèčáàæœﬁꝛßſú]/xms;
-my $punctuation = qr/[.;:!?=-]/xms;
-my $numeric = qr/ \d+ | \d+[).] | [+-]\d+ (?: [\/\.]\d+ )? /xms;
-my $word    = qr/ (?: $LETTER | $letter ) (?: $letter )* (?: [=-] (?: $LETTER | $letter ) (?: $letter)* )* /xms;
-my $sane    = qr/ (?: (?: $prefix )? $word (?: $suffix)? ) | $numeric (?: $suffix)? | $punctuation /xms;
+my $lookup = 0;
+
+my $prefix  = qr/ [\(\[\{]{0,2} [«·»='"—-]? /xms;
+my $suffix  = qr/ [«=‚’'"\.]? [\)\]\}]{0,2} [·,\.;:!?=—-]{0,2} | [=—-] /xms;
+my $LETTER  = qr/ [A-ZÏËÖÜÄÉÈČÁÀÆŒ] /xms;
+my $letter  = qr/ [’a-zïëöüäåéèčáàæœﬁﬂꝛßſúó] /xms;
+my $punctuation = qr/[.;:!?=&—-]/xms;
+my $numeric = qr/
+  (?:
+    [+-]?
+    (?:
+      \d+
+      | (?: \d* [.] \d+ )
+      | (?: \d+ [\/] \d+ )
+    )
+    [%]?
+  )
+/xms;
+my $range      = qr/ $numeric [—-] $numeric /xms;
+my $ordinal    = qr/ (?: 1st | 2nd | 3rd | \d+th ) /xms;
+my $date       = qr! \d{1,2} [\.\/:-] \d{1,2} [\.\/:-] \d{2,4} !xms;
+my $date_range = qr/ $date [—-] $date /xms;
+my $geo_coord  = qr/ \d{1,2} ° \d{1,2} ['] \d{1,2} ["] [SNWE] /xms;
+my $periods    = qr/ \.{3,} /xms;
+my $roman      = qr/ [MCLVImclvi]+ /xms;
+my $word       = qr/
+  (?: $LETTER | $letter )
+  (?: $letter )*
+  (?: [=—-]
+  (?: $LETTER | $letter )
+  (?: $letter)* )*
+/xms;
+
+my $WORD    = qr/
+  (?: $LETTER )+
+  (?: [=—-]
+    (?: $LETTER)+
+  )*
+/xms;
+
+
+my $sane    = qr/
+  (?:
+    (?: $prefix )?
+    (?:
+      $word
+      | $WORD
+      | $numeric
+      | $punctuation
+      | $periods
+      | $range
+      | $ordinal
+      | $date
+      | $date_range
+      | $geo_coord
+      | $roman
+    )
+    (?: $suffix)?
+  )
+/xms;
 
 my $dicts = {
   'fra_10K' => {
@@ -96,6 +153,13 @@ my $lookup_count = 0;
 
 for my $file (@files) {
   score_file($file);
+}
+
+#print_crap();
+#print Dumper($crap);
+
+for my $crap_word (sort keys %$crap) {
+  #print $crap_word,': ',$crap->{$crap_word},"\n";
 }
 
 sub dict_lookup {
@@ -179,10 +243,12 @@ sub score_file {
         if (@similar) {
           $crap_similar++;
         }
-        print $piece, "\n";
+        #print $piece, "\n";
+        $crap->{$piece}++;
       }
     }
   }
+  if (0) {
   print "\n";
   print '*** file: ',$file, "\n";
   print 'tokens:     ',sprintf('%6s',$pieces_count), "\n";
@@ -194,7 +260,12 @@ sub score_file {
   for my $dict_name (sort keys %$dict_matches) {
     print '   ',$dict_name,': ',sprintf('%6s',$dict_matches->{$dict_name}), ' (',sprintf('%0.2f',($dict_matches->{$dict_name}/$pieces_count)), ")\n";
   }
-
+  }
+  elsif ($pieces_count) {
+    #print "\n";
+    print '*** file: ',$file,
+    'tokens: ',sprintf('%6s',$pieces_count),'crap: ',sprintf('%6s',$crap_count),' (',sprintf('%0.2f',($crap_count/$pieces_count)), ")\n";
+  }
 }
 
 #for my $key (sort { $words->{$b} <=> $words->{$a}} keys %$words) {

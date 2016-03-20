@@ -366,12 +366,15 @@ sub calc_stats {
   $stats->{'items_ocr'} = ($matches + $inserts + $substitutions);
   $stats->{'items_grt'} = ($matches + $deletions + $substitutions);
   $stats->{'edits'} = ($inserts + $deletions + $substitutions);
-  $stats->{'precision'} = $matches / ($matches + $substitutions + $inserts);
-  $stats->{'recall'} = $matches / ($matches + $substitutions + $deletions);
-  $stats->{'accuracy'} = $matches / ($matches + $substitutions + $inserts + $deletions);
-  $stats->{'f_score'} =
-    ( 2 * $stats->{'recall'} * $stats->{'precision'} )
-      / ($stats->{'recall'} + $stats->{'precision'} );
+  $stats->{'precision'} = (($matches + $substitutions + $inserts) > 0 ) ?
+    ($matches / ($matches + $substitutions + $inserts)) : 0;
+  $stats->{'recall'} = (($matches + $substitutions + $deletions) > 0 ) ?
+    ($matches / ($matches + $substitutions + $deletions)) : 0;
+  $stats->{'accuracy'} = (($matches + $substitutions + $inserts + $deletions) > 0 ) ?
+    ($matches / ($matches + $substitutions + $inserts + $deletions)) : 0;
+  $stats->{'f_score'} = (($stats->{'recall'} + $stats->{'precision'}) > 0 ) ?
+    (( 2 * $stats->{'recall'} * $stats->{'precision'} )
+      / ($stats->{'recall'} + $stats->{'precision'} )) : 0;
 }
 
 __END__
@@ -411,7 +414,7 @@ Print alignment of lines. Default: off.
 
 =item B<-trim_words>, B<-t>
 
-Trim punction characters at start and end of words. Default: on.
+Trim punctuation characters at start and end of words. Default: on.
 
 =item B<-word_matches>, B<-w>
 
@@ -419,7 +422,7 @@ Report mismatches of words with frequencies. Default: off.
 
 =item B<-char_matches>, B<-c>
 
-Report mismatches of words with frequencies. Default: off.
+Report mismatches of chars with frequencies. Default: off.
 
 =item B<-match_table>, B<-m>
 
