@@ -5,7 +5,6 @@ use warnings;
 use utf8;
 
 use String::Similarity;
-# $similarity = similarity $string1, $string2, $limit;
 
 use Data::Dumper;
 
@@ -30,7 +29,7 @@ my $crap_all = 0;
 
 my $crap = {};
 
-my $lookup = 0;
+my $lookup = 1;
 
 my $prefix  = qr/ [\(\[\{]{0,2} [«·»='"—-]? /xms;
 my $suffix  = qr/ [«=‚’'"\.]? [\)\]\}]{0,2} [·,\.;:!?=—-]{0,2} | [=—-] /xms;
@@ -204,6 +203,7 @@ sub score_file {
   my $file = shift;
 
   my $pieces_count = 0;
+  my $sane_count = 0;
   my $word_count = 0;
   my $crap_count = 0;
   my $dict_count = 0;
@@ -220,21 +220,24 @@ sub score_file {
 
     for my $piece (@pieces) {
       if ($piece =~ m/^$sane$/) {
-        $word_count++;
-        my @matches = dict_lookup($piece);
-        if (@matches) {
-          $dict_count++;
-          my $dict = shift @matches;
-          #for my $dict (@matches) {
-          $dict_matches->{$dict}++;
-          #}
-        }
-        else {
-          my @similar = dict_similar($piece);
-          if (@similar) {
-            $words_similar++;
+        $sane_count++;
+        if ($piece =~ m/^($WORD|$word)$/) {
+          $word_count++;
+          my @matches = dict_lookup($piece);
+          if (@matches) {
+            $dict_count++;
+            my $dict = shift @matches;
+            #for my $dict (@matches) {
+            $dict_matches->{$dict}++;
+            #}
           }
-          #print $piece, "\n";
+          else {
+            my @similar = dict_similar($piece);
+            if (@similar) {
+              $words_similar++;
+            }
+            #print $piece, "\n";
+          }
         }
       }
       else {
@@ -248,14 +251,15 @@ sub score_file {
       }
     }
   }
-  if (0) {
+  if (1) {
   print "\n";
   print '*** file: ',$file, "\n";
   print 'tokens:     ',sprintf('%6s',$pieces_count), "\n";
-  print 'crap:       ',sprintf('%6s',$crap_count), ' (',sprintf('%0.2f',($crap_count/$pieces_count)), ")\n";
-  print '    sim .7: ',sprintf('%6s',$crap_similar), ' (',sprintf('%0.2f',($crap_similar/$pieces_count)), ")\n";
-  print 'words:      ',sprintf('%6s',$word_count), ' (',sprintf('%0.2f',($word_count/$pieces_count)), ")\n";
-  print 'in dicts:   ',sprintf('%6s',$dict_count), ' (',sprintf('%0.2f',($dict_count/$pieces_count)), ")\n";
+  print 'crap:       ',sprintf('%6s',$crap_count),    ' (',sprintf('%0.2f',($crap_count/$pieces_count)), ")\n";
+  print '    sim .7: ',sprintf('%6s',$crap_similar),  ' (',sprintf('%0.2f',($crap_similar/$pieces_count)), ")\n";
+  print 'sane:       ',sprintf('%6s',$sane_count),    ' (',sprintf('%0.2f',($sane_count/$pieces_count)), ")\n";
+  print 'words:      ',sprintf('%6s',$word_count),    ' (',sprintf('%0.2f',($word_count/$pieces_count)), ")\n";
+  print 'in dicts:   ',sprintf('%6s',$dict_count),    ' (',sprintf('%0.2f',($dict_count/$pieces_count)), ")\n";
   print '    sim .7: ',sprintf('%6s',$words_similar), ' (',sprintf('%0.2f',($words_similar/$pieces_count)), ")\n";
   for my $dict_name (sort keys %$dict_matches) {
     print '   ',$dict_name,': ',sprintf('%6s',$dict_matches->{$dict_name}), ' (',sprintf('%0.2f',($dict_matches->{$dict_name}/$pieces_count)), ")\n";
@@ -264,7 +268,7 @@ sub score_file {
   elsif ($pieces_count) {
     #print "\n";
     print '*** file: ',$file,
-    'tokens: ',sprintf('%6s',$pieces_count),'crap: ',sprintf('%6s',$crap_count),' (',sprintf('%0.2f',($crap_count/$pieces_count)), ")\n";
+    ' tokens: ',sprintf('%6s',$pieces_count),' crap: ',sprintf('%6s',$crap_count),' (',sprintf('%0.2f',($crap_count/$pieces_count)), ")\n";
   }
 }
 
