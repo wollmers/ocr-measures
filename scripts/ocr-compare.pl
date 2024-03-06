@@ -4,16 +4,21 @@ use strict;
 use warnings;
 use utf8;
 
-use lib qw(../lib/ /Users/helmut/github/ocr-hw/ocr-measures/lib);
+use lib qw(
+../lib/
+/Users/helmut/github/ocr-hw/ocr-measures/lib
+/Users/helmut/github/perl/Levenshtein-Simple/lib
+);
 
 use Getopt::Long  '2.32';
 use Pod::Usage;
 
+use Unicode::Normalize;
 use OCR::Compare;
 
 #use Data::Dumper;
 
-our $VERSION = '0.03';
+our $VERSION = '0.05';
 
 binmode(STDOUT,":encoding(UTF-8)");
 binmode(STDERR,":encoding(UTF-8)");
@@ -23,20 +28,20 @@ binmode(STDERR,":encoding(UTF-8)");
 my $verbose;
 my $lines        = 1; # details aligned lines: 1=short,2=full
 my $clean_words  = 0; # remove punctuation from words
-my $word_matches = 0;
-my $char_matches = 0;
+my $word_matches = 1;
+my $char_matches = 1;
 my $match_table  = 1;
-my $help = 0;
-my $man = 0;
+my $help         = 0;
+my $man          = 0;
 
 GetOptions(
-  'lines|l'           => \$lines,
-  'trim_words|t'      => \$clean_words,
-  'word_matches|w'    => \$word_matches,
-  'char_matches|c'    => \$char_matches,
-  'match_table|m'     => \$match_table,
-  'help|h'			  => \$help,
-  'man'			      => \$man,
+    'lines|l'           => \$lines,
+    'trim_words|t'      => \$clean_words,
+    'word_matches|w'    => \$word_matches,
+    'char_matches|c'    => \$char_matches,
+    'match_table|m'     => \$match_table,
+    'help|h'            => \$help,
+    'man'               => \$man,
 )
 or pod2usage(2);
 pod2usage(1) if $help;
@@ -49,20 +54,24 @@ pod2usage(-exitval => 0, -verbose => 2) if $man;
 #   https://stackoverflow.com/questions/3807231/how-can-i-test-if-i-can-write-to-a-filehandle
 #   https://stackoverflow.com/questions/16060919/alias-file-handle-to-stdout-in-perl
 #######################
-my $file1 = '';
-my $file2 = ''; # ground truth
+my $file1 = ''; # ground truth
+my $file2 = '';
 
 # $ARGV[0]\n";
 if (@ARGV >= 1) {
-  $file1 = $ARGV[0];
-  if (@ARGV >= 2) {
-    $file2 = $ARGV[1];
-  }
+    $file1 = $ARGV[0];
+    if (@ARGV >= 2) {
+        $file2 = $ARGV[1];
+    }
 }
 
 pod2usage(1) unless ($file1 && $file2);
 
-my $reportfile = 'ocr-compare.txt';
+#my $reportfile = 'ocr-compare.txt';
+my $reportfile =  $file2;
+$reportfile    =~ s/\.txt$//;
+$reportfile    .= '.diff.txt';
+
 open(my $report_fh,">:encoding(UTF-8)",$reportfile) or die "cannot open $reportfile: $!";
 
 print $report_fh $0,' Version ',$VERSION,"\n";
@@ -77,20 +86,20 @@ open(my $in2,"<:encoding(UTF-8)",$file2) or die "cannot open $file2: $!";
 
 my $nl = '¶';
 chomp(my @lines = <$in1>);
-my @lines1   = map { $_ =~ s/\s+$//; my $s = $_ . $nl; $s} grep {/./} @lines;
+my @lines1   = map { $_ =~ s/\s+$//; my $s = $_ . $nl; NFC($s); } grep {/./} @lines;
 chomp(@lines = <$in2>);
-my @lines2   = map { $_ =~ s/\s+$//; my $s = $_ . $nl; $s} grep {/./} @lines;
+my @lines2   = map { $_ =~ s/\s+$//; my $s = $_ . $nl; NFC($s); } grep {/./} @lines;
 
 my $compare = OCR::Compare->new({
-	'verbose'      => $verbose,
-	'lines'        => $lines,
-	'clean_words'  => $clean_words,   # remove punctuation from words
-	'word_matches' => $word_matches,   # print word matches
-	'char_matches' => $char_matches,   # print char matches
-	'match_table'  => $match_table,   # print match table
-	'nl'           => '¶', # character for end of line
-	'threshold'    => 0.5, # similarity of lines
-	'report_fh'    => $report_fh,           # file handle
+    'verbose'      => $verbose,
+    'lines'        => $lines,
+    'clean_words'  => $clean_words,   # remove punctuation from words
+    'word_matches' => $word_matches,  # print word matches
+    'char_matches' => $char_matches,  # print char matches
+    'match_table'  => $match_table,   # print match table
+    'nl'           => '¶',            # character for end of line
+    'threshold'    => 0.5,            # similarity of lines
+    'report_fh'    => $report_fh,     # file handle
 });
 
 $compare->compare(\@lines1, \@lines2);
@@ -105,7 +114,7 @@ ocr_compare.pl - compare ground truth against OCR output
 
 =head1 SYNOPSIS
 
-ocr_compare.pl [options] ground_truh_file ocrfile
+ocr_compare.pl [options] ground_truth_file ocrfile
 
  Options:
    -help            brief help message
@@ -122,7 +131,7 @@ useful with the contents thereof.
 
 =item B<-help>
 
-Print a brief help message and exits.
+Prints a brief help message and exits.
 
 =item B<-man>
 
