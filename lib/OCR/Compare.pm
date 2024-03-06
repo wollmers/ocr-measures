@@ -194,23 +194,23 @@ sub print_matches {
 
     my $report_fh = $self->{'report_fh'};
 
-	if ($self->{'word_matches'}) {
-    	print $report_fh "\n";
-    	print $report_fh 'Word mismatches:',"\n";
-    	$self->print_mismatches('words',1);
-	}
+    if ($self->{'word_matches'}) {
+        print $report_fh "\n";
+        print $report_fh 'Word mismatches:',"\n";
+        $self->print_mismatches('words',1);
+    }
 
-	if ($self->{'char_matches'}) {
-    	print $report_fh "\n";
-    	print $report_fh 'Character mismatches:',"\n";
-    	$self->print_mismatches('chars',1);
-	}
+    if ($self->{'char_matches'}) {
+        print $report_fh "\n";
+        print $report_fh 'Character mismatches:',"\n";
+        $self->print_mismatches('chars',1);
+    }
 
-	if ($self->{'match_table'}) {
-    	print $report_fh "\n";
-    	print $report_fh 'Character match (confusion) table:',"\n";
-    	$self->print_confusion_table('chars',1);
-	}
+    if ($self->{'match_table'}) {
+        print $report_fh "\n";
+        print $report_fh 'Character match (confusion) table:',"\n";
+        $self->print_confusion_table('chars',1);
+    }
 }
 
 
@@ -306,48 +306,48 @@ sub print_confusion_table {
 }
 
 our $map = {
-	'a' => [qw(à aͤ s)],
-	'b' => [qw(d h v)],
+    'a' => [qw(à aͤ s)],
+    'b' => [qw(d h v)],
     'c' => [qw(e &)],
-	'd' => [qw(c)],
-	'e' => [qw(c)],
-	'é' => [qw(e ë ẽ c)],
-	'ê' => [qw(è)],
-	'f' => [qw(t ſ s)],
+    'd' => [qw(c)],
+    'e' => [qw(c)],
+    'é' => [qw(e ë ẽ c)],
+    'ê' => [qw(è)],
+    'f' => [qw(t ſ s)],
     'i' => [qw(t)],
-	'j' => [qw(ſ)],
-	'k' => [qw(h)],
-	'l' => [qw(h t ü ſ)],
+    'j' => [qw(ſ)],
+    'k' => [qw(h)],
+    'l' => [qw(h t ü ſ)],
     'm' => [qw(n)],
-	'n' => [qw(u g m y)],
-	'oͤ' => [qw(o ö)],
-	'r' => [qw(c i î t)],
-	's' => [qw(S oͤ)],
+    'n' => [qw(u g m y)],
+    'oͤ' => [qw(o ö)],
+    'r' => [qw(c i î t)],
+    's' => [qw(S oͤ)],
     't' => [qw(i f l r)],
     'u' => [qw(u᷑ n)],
-	'ü' => [qw(ũ i l t u ũ)],
+    'ü' => [qw(ũ i l t u ũ)],
     'w' => [qw(V)],
     'x' => [qw(z)],
     'y' => [qw(p)],
     'ſ' => [qw(f i j l { )],
 
-	'D' => [qw(B)],
-	'E' => [qw(B)],
-	'H' => [qw(B I S)],
-	'I' => [qw(J)],
-	'J' => [qw(j)],
+    'D' => [qw(B)],
+    'E' => [qw(B)],
+    'H' => [qw(B I S)],
+    'I' => [qw(J)],
+    'J' => [qw(j)],
     'L' => [qw(T)],
     'M' => [qw(N)],
     'R' => [qw(K)],
 
-	',' => [qw(.)],
-	'-' => [qw(—)],
-	';' => [qw(3)],
-	'⸗' => [qw(—)],
+    ',' => [qw(.)],
+    '-' => [qw(—)],
+    ';' => [qw(3)],
+    '⸗' => [qw(—)],
 
-	'1' => [qw(4)],
-	'3' => [qw(2 8)],
-	'5' => [qw(6)],
+    '1' => [qw(4)],
+    '3' => [qw(2 8)],
+    '5' => [qw(6)],
 
 };
 
@@ -355,14 +355,14 @@ our $confusables;
 
 sub get_map {
 
-	return $confusables if (defined $confusables);
+    return $confusables if (defined $confusables);
 
-	for my $char1 (keys %$map) {
-		for my $char2 ( @{$map->{$char1}} ) {
-			$confusables->{$char1}->{$char2} = 1;
-			$confusables->{$char2}->{$char1} = 1;
-		}
-	}
+    for my $char1 (keys %$map) {
+        for my $char2 ( @{$map->{$char1}} ) {
+            $confusables->{$char1}->{$char2} = 1;
+            $confusables->{$char2}->{$char1} = 1;
+        }
+    }
     return $confusables;
 }
 
@@ -393,10 +393,10 @@ sub _relation_aligned {
     my $subst  = '~';
 
     for my $chunk (@$aligned) {
-        if    ($chunk->[0]  eq $chunk->[1])  { $line .= $match; }
-        elsif (!$chunk->[0] && $chunk->[1])  { $line .= $insert; }
-        elsif ($chunk->[0]  && !$chunk->[1]) { $line .= $delete; }
-        else                                 { $line .= $subst; }
+        if    ($chunk->[0]  eq $chunk->[1]) { $line .= $match; }
+        elsif ($chunk->[0]  eq '')          { $line .= $insert; }
+        elsif ($chunk->[1]  eq '')          { $line .= $delete; }
+        else                                { $line .= $subst; }
     }
     return $line;
 }
